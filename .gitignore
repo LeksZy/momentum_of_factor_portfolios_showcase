@@ -1,0 +1,15 @@
+# Track only the project presentation. Research files remain local.
+*
+!.gitignore
+!README.md
+!docs/
+docs/*
+!docs/strategy.md
+!docs/research.md
+!docs/results.md
+!docs/assets/
+docs/assets/*
+!docs/assets/selected_f76421ce.png
+!docs/assets/grid_test_performance.png
+!docs/assets/grid_parameter_sensitivity.png
+!docs/assets/optuna_train_test.png
