@@ -11,7 +11,7 @@ I built a research and backtesting pipeline to study whether recent performance 
 - **Data pipeline:** incremental market-data and fundamental-data updates in SQLite, with aligned prices, dividends, financial ratios and funding rates exported to reusable Parquet research snapshots.
 - **Portfolio engine:** factor-based stock selection, momentum-based allocation, overlapping-position netting, drifting holdings, and explicit cash and funding accounting.
 - **Optimization and evaluation:** seeded factor-combination searches, parameter grids and Optuna studies, with cached calculations and parallel workers; chronological splits and expanding-window experiments to examine sensitivity.
-- **Execution research:** a separate, later minute-level simulator with volume participation limits, partial fills, lot/tick rounding, latency and trading-cost assumptions. Its engineering tests cover fill timing and portfolio accounting; these features are separate from the headline backtest.
+- **Execution research:** a separate, later minute-level simulator with volume participation limits, partial fills, lot/tick rounding, latency and trading-cost assumptions. Its engineering tests cover fill timing and portfolio accounting; these features are separate from the selected configuration’s backtest.
 
 **Tools:** Python · pandas · NumPy · SQLite · Parquet · Optuna · joblib
 
@@ -42,10 +42,10 @@ flowchart LR
 
 A stock's momentum helps form a basket. The basket's momentum determines its allocation. This separation is the central idea of the project.
 
-## Explore the project
+## Documentation
 
 - [Strategy and implementation decisions](docs/strategy.md): factor definitions, portfolio accounting and execution research.
 - [Selected results](docs/results.md): performance of the configuration I used, including drawdown and interpretation.
-- [Research process](docs/research.md): data preparation, search design and expandable results from other experiments.
+- [Research process](docs/research.md): data preparation, search design and results from other experiments.
 
-This is a presentation of an internal project. Source code, datasets and detailed trading records remain private.
+Source code, datasets and detailed trading records remain private.

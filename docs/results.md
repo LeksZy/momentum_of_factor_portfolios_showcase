@@ -34,8 +34,8 @@ The selected setup uses daily close rebalancing, a 0.75-month portfolio-momentum
 | Annualized Sharpe | Daily mean return divided by sample standard deviation, multiplied by √252. No additional risk-free series is subtracted after financing. |
 | Maximum drawdown | Largest decline from a preceding wealth peak, shown as a positive loss magnitude in the table. |
 
-Figures were reconciled against the saved daily return series and run summaries. Segment returns compound; they should not be added together.
+All metrics use the saved daily portfolio returns. Segment returns compound; they should not be added together.
 
-No benchmark outperformance is claimed. The earlier benchmark snapshot contains MCFTR under an IMOEXF input label and ends before the full evaluation period; a like-for-like full-period comparison is not established here.
+A comparable full-period benchmark series is unavailable: the earlier snapshot contains MCFTR under an IMOEXF input label and ends before the evaluation period.
 
 Other configurations produced mixed results, including negative later-period returns. Their [grid, Optuna and walk-forward diagnostics](research.md#experiment-diagnostics) remain available as research context. They do not establish robustness of the selected configuration.

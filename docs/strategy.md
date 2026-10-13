@@ -68,10 +68,10 @@ A later research extension addresses execution explicitly:
 
 The later simulator is a **research prototype**. Existing tests cover timing, partial fills, unavailable shorts, lot/tick constraints, costs, funding and restart accounting; the 16-test suite passes. These checks establish accounting behavior, not improved performance or deployed execution.
 
-Historical order-book depth and a calibrated market-impact model are not available in this evidence. VWAP appears as an execution benchmark; a deployed VWAP execution algorithm has not been established. The later simulator has not been used to restate the selected strategy's headline returns.
+The simulator uses minute-bar price and volume proxies; it has no historical order-book replay or calibrated market-impact model. VWAP is an execution benchmark. Live VWAP execution remains unverified, and the selected backtest has not been rerun with the later simulator.
 
 ## Interpretation and next steps
 
 The main research limitations are the fixed universe, assumed information availability and missing-return handling. Part of the earlier factor implementation also applies a rolling-signal shift across stock boundaries at the first observation of a new stock. Historical strategy versions therefore need to be distinguished when reproducing or extending the work.
 
-The next evaluation step is to apply the execution model to a frozen configuration and reserved period, with measured spread, borrow and liquidity inputs. That would support a more informative comparison of theoretical and executable returns. [Searches and validation evidence](research.md).
+The next evaluation step is to apply the execution model to a frozen configuration and reserved period, with measured spread, borrow and liquidity inputs. That would support a more informative comparison of theoretical and executable returns. [Searches and validation](research.md).

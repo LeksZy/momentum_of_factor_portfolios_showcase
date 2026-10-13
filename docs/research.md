@@ -6,9 +6,9 @@ I built the pipeline from data ingestion and factor construction through portfol
 
 ## Data engineering and provenance
 
-The private companion project contains collectors for MOEX ISS and optional AlgoPack market data, MOEX dividend/split feeds, CBonds dividends and financial reports, and CBR RUONIA rates. Incremental date-based updates and SQLite upserts support repeatable refreshes. Parquet snapshots provide reusable inputs for research; a review interface exposes signals, allocations and saved runs.
+The data pipeline includes collectors for MOEX ISS and optional AlgoPack market data, MOEX dividend/split feeds, CBonds dividends and financial reports, and CBR RUONIA rates. Incremental date-based updates and SQLite upserts support repeatable refreshes. Parquet snapshots provide reusable inputs for research; a research interface displays signals, allocations and saved runs.
 
-Processing includes instrument metadata, split-adjustment bookkeeping, financial-statement currency/unit normalization and trailing-earnings calculations. These implemented connectors clarify the collection pipeline. They do not, on their own, reconstruct the exact historical input snapshot or corporate-action conventions behind every saved experiment.
+Processing includes instrument metadata, split-adjustment bookkeeping, financial-statement currency/unit normalization and trailing-earnings calculations. Exact reproduction of earlier experiments still requires their original input snapshots and corporate-action conventions.
 
 The earlier research version has a fixed universe of 45 identifiers, with quotes available for 41 in its local snapshot. There is no historical index-membership reconstruction or original volume-based eligibility filter.
 
@@ -26,7 +26,7 @@ The selected strategy uses a later SQL-derived input snapshot through April 2026
 
 The search has two levels. The **inner search** chooses a portfolio specification for each enabled factor category: its signal, observation window and long/short direction. The **outer search** varies how those portfolios are selected and combined.
 
-| Study | Search space and computation | Saved evidence |
+| Study | Search space and computation | Saved outputs |
 | --- | --- | --- |
 | 24-setting grid | Weekly, biweekly or monthly resets; 1- or 3-month portfolio momentum; 5 or 10 stocks per leg; 1 or 2 selected portfolios. Up to 65,536 inner combinations per setting; base seed 42, derived per-setting seeds and all available workers. | Completed return series and chronological train/test summaries. |
 | Earlier 54-setting grids | Added a 0.5-month lookback and a third selected portfolio; combination budgets varied between runs. | Additional parameter-search records; different runs are not controlled comparisons. |
@@ -35,9 +35,9 @@ The search has two levels. The **inner search** chooses a portfolio specificatio
 
 The primary objective is annualized daily Sharpe. Other experiments use return–drawdown objectives or rebalance-start sensitivity penalties. The optimizer supports both Optuna grid and TPE sampling; the saved 50-trial configuration does not record its sampler choice.
 
-To control computation, I cached candidate returns, used array-based portfolio calculations and parallelized independent evaluations with joblib. When exhaustive search was too large, the inner search sampled distinct combinations with deterministic seeds and a fixed evaluation budget. This makes searches repeatable under matching inputs, without claiming a global optimum or a measured speedup.
+To control computation, I cached candidate returns, used array-based portfolio calculations and parallelized independent evaluations with joblib. When exhaustive search was too large, the inner search sampled distinct combinations with deterministic seeds and a fixed evaluation budget. Fixed inputs and seeds make searches repeatable. Budgeted searches do not guarantee a global optimum; computational speedup was not benchmarked.
 
-The selected run reused six previously selected specifications. Its saved settings include seed 42, one worker and a combination cap of one. These are evaluation settings, not evidence that the selected strategy emerged from a one-trial optimization. Later changes to momentum thresholds and execution assumptions are separate strategy versions.
+The selected run reused six previously selected specifications. Its saved settings include seed 42, one worker and a combination cap of one. This run evaluated an existing configuration rather than optimizing a new one. Later changes to momentum thresholds and execution assumptions are separate strategy versions.
 
 ## Validation and interpretation
 
@@ -48,13 +48,13 @@ The selected run reused six previously selected specifications. Its saved settin
 | Expanding-window exercise | Two successive later periods, with factor combinations reselected from preceding history | Fold averages and compounded returns across both periods answer different questions. |
 | Selected strategy | Full history divided 70/30; later reporting begins 17 Feb 2025 | Fixed specifications and full-window scoring; the split is not an independent final test. |
 
-Test statistics were visible during research and could influence configuration choices. Separate studies therefore cannot be arranged into a proven sequence of improvements. Rebalance-start sensitivity was also explored, but the saved multi-anchor batch produced no successful trials. Incomplete batches do not establish robustness.
+Test statistics were visible during research and could influence configuration choices. Differences in inputs and periods prevent a controlled comparison between studies. Rebalance-start sensitivity was also explored, but the saved multi-anchor batch produced no successful trials. Incomplete batches do not establish robustness.
 
 ## Execution research and reproducibility
 
-Subsequent work added a minute-level execution simulator, liquidity and capacity diagnostics, and paper-replay accounting. Participation limits, partial fills, latency, tradable lot sizes and cost assumptions are implemented there. VWAP is used as a benchmark. These extensions have engineering tests, but no reconciled result here demonstrates improved performance under execution constraints. [Implementation and remaining limits](strategy.md#rebalancing-and-execution-research).
+Subsequent work added a minute-level execution simulator, liquidity and capacity diagnostics, and paper-replay accounting. Participation limits, partial fills, latency, tradable lot sizes and cost assumptions are implemented there. VWAP is used as a benchmark. These extensions have engineering tests; their performance impact has not yet been quantified in a reconciled backtest. [Implementation and remaining limits](strategy.md#rebalancing-and-execution-research).
 
-The public repository contains documentation and summary figures. Reproducing the historical strategy requires the private implementation, the matching version and configuration, and the original price, dividend, financial and funding snapshots. Current collectors or defaults alone are insufficient to reproduce an old run exactly. The published selected-strategy metrics were recomputed from saved daily returns; they are not a new backtest using today's data.
+Reproducing the historical strategy requires the private implementation, the matching version and configuration, and the original price, dividend, financial and funding snapshots. Current collectors or defaults alone are insufficient to reproduce an old run exactly. The selected-strategy metrics use the saved daily return series from the original run.
 
 ## Experiment diagnostics
 

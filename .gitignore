@@ -1,4 +1,4 @@
-# Track only the project presentation. Research files remain local.
+# Documentation and figures only.
 *
 !.gitignore
 !README.md
