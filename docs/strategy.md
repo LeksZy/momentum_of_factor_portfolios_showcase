@@ -1,63 +1,77 @@
-# Strategy
+# Strategy and implementation
 
-[Overview](../README.md) · [Research process](research.md) · [Results](results.md)
+[Overview](../README.md) · [Selected results](results.md) · [Research process](research.md)
 
-I developed this strategy to test whether recent factor-portfolio performance can guide allocations within a Russian equity universe. The process has two layers: rank stocks by their characteristics, then allocate among the resulting portfolios using their trailing returns. Stock momentum is one input; momentum of factor portfolios determines the final allocation.
+## Research idea
 
-## The configuration I selected
+A **factor portfolio** is a basket of stocks ranked by a shared characteristic: for example, low valuations or high recent returns. Different baskets can perform differently as market conditions change. I investigated whether their recent performance could guide allocation between them.
 
-I chose **`f76421ce`** because its backtest results looked promising and used this configuration in live trading. It combines six fixed factor portfolios, **daily close rebalancing**, a **0.75-month** portfolio-momentum lookback and **10 stocks per selection leg**. Qualifying portfolios receive weights proportional to their positive momentum scores. Staggered rebalancing is disabled.
+The strategy has two decisions: which stocks belong in each basket, and how much capital each basket receives. **Stock momentum** is one stock-selection signal; **portfolio momentum** is the allocation signal applied to all candidate baskets.
 
-| Factor portfolio | Stock-selection signal |
+The research uses a fixed universe of Russian-market identifiers. Eligibility depends on available prices and factor observations. It does not reconstruct historical index membership, and the original selection has no volume or spread screen.
+
+## Selected configuration
+
+I selected `f76421ce` for its promising historical results and used it in live trading. Its saved configuration is:
+
+| Decision | Setting |
 | --- | --- |
-| High minus low beta | One-week beta |
-| High minus low stock momentum | Two-week momentum |
-| Short low-momentum stocks | Three-month momentum |
-| High minus low volatility | Three-month volatility |
-| High minus low dividend carry | Three-month carry |
+| Rebalance schedule | Daily close, Monday–Friday calendar |
+| Allocation signal | Trailing factor-portfolio return over 0.75 months |
+| Stock selection | Ten stocks per selection leg, subject to eligible observations |
+| Candidate set | Six fixed factor-portfolio specifications |
+| Allocation weights | Proportional to strictly positive portfolio-momentum scores |
+| Staggered tranches | Disabled |
+
+Several candidates can receive capital simultaneously. The recorded factor-count setting does not cap this momentum-weighted allocation mode. The original positive-return cutoff was zero; a later 1.5% default describes a different strategy version.
+
+| Selected basket | Signal and interpretation |
+| --- | --- |
+| High minus low beta | One-week sensitivity to the supplied market benchmark |
+| High minus low stock momentum | Two-week compounded stock returns |
+| Short low-momentum stocks | Three-month stock returns |
+| High minus low volatility | Three-month return dispersion |
+| High minus low dividend carry | Three-month dividends relative to price |
 | Low minus high P/E | Positive price-to-earnings ratios |
 
-These six portfolios form the candidate set. Their allocations vary through time, and several can receive capital together. The original configuration uses a **strictly positive** momentum threshold. A later 1.5% threshold changes the strategy and should not be applied to the original results.
+Long–short baskets initially assign total weight +1 to the long leg and −1 to the short leg. Their gross exposure is two before opposing positions cancel. The combined portfolio can have changing net and gross exposures; its allocation weights summing to one does not make it market-neutral.
 
-## From data to positions
+## Portfolio engineering
 
-```mermaid
-flowchart TD
-    A[Prices, dividends and financial data] --> B[Align dates and calculate stock factors]
-    C[Benchmark] --> B
-    B --> D[Construct factor portfolios]
-    D --> E[Calculate trailing portfolio returns]
-    E --> F[Allocate by portfolio momentum]
-    F --> G[Combine security positions]
-    G --> H[Simulate returns, funding and cash]
-    R[RUONIA rates] --> H
-    H --> I[Compare parameters and evaluate later periods]
-```
+| Problem | Implementation decision | Consequence |
+| --- | --- | --- |
+| The same stock appears in multiple baskets | Aggregate signed security weights and net opposing positions | Exposure reflects the combined position, rather than the sum of separate basket exposures. |
+| Holdings change value between resets | Allow security weights to drift | The assembled strategy differs from the fixed-weight return proxies used to rank candidate baskets. |
+| Missing or stale prices | Substitute zero for missing security returns in the main simulation | Keeps the return matrix aligned, but can understate uncertainty; some factor calculations instead omit missing observations. |
+| Financial information has a release delay | Apply an assumed 30-calendar-day lag in the research factor construction | A lag is a proxy for availability; actual publication timestamps remain unverified. |
+| Signals and execution occur at different times | Apply decisions dated T to the next observed return interval | Close-price fills remain an assumption; the simulation does not demonstrate their availability. |
+| Cash and long/short positions need consistent financing | Account for RUONIA funding and cash accrual separately | Simplified financing can differ from broker margin and stock-borrow terms. |
 
-The research universe is a fixed list of Russian-market identifiers. Eligibility depends on available prices and factor observations. It is not a historical reconstruction of index membership, and the original research selection does not screen stocks by trading volume or spreads.
+RUONIA, the overnight ruble rate, is converted to a daily rate by dividing its annual decimal value by 252. The model charges funding on one unit of principal and accrues cash on one minus net exposure. The resulting net financing adjustment is **minus net exposure × daily RUONIA**. Flat and net-zero positions receive no net accrual under this convention.
 
-Beta measures sensitivity to the supplied benchmark. Momentum compounds price and dividend returns; volatility measures their dispersion. Carry compares trailing dividends with price. Value uses available positive P/E or P/B ratios, with an assumed 30-calendar-day financial-information lag. That lag does not verify the date on which each report became public.
+Dividends enter stock returns on the next observed trading date. Whole-month portfolio lookbacks use calendar offsets; fractional months use 30 days per month. These conventions are part of the historical model, rather than assumptions about actual settlement dates.
 
-Each factor portfolio ranks eligible stocks and forms a long, short or long–short basket. A long–short basket initially assigns total weight +1 to the long leg and −1 to the short leg. Its nominal gross exposure is therefore two before overlapping positions cancel. Combining factor portfolios can produce different net and gross exposures even when portfolio-allocation weights sum to one.
+## Rebalancing and execution research
 
-Portfolio momentum is measured before the allocation takes effect. Whole-month lookbacks use calendar offsets; fractional months use 30 days per month. The broader research also compares equal-weight allocations among the highest-ranked qualifying portfolios with the momentum-weighted rule used in `f76421ce`.
+**Staggering** spreads portfolio resets across multiple schedules. It was explored as a timing choice and is disabled in `f76421ce`. It does not, by itself, constrain trading to available volume.
 
-## Portfolio accounting
+A later research extension addresses execution explicitly:
 
-The strategy combines security weights across factor portfolios, nets opposing positions and allows weights to drift between target resets. Dividend amounts enter stock returns on the next observed trading date. Missing security returns are treated as zero in the main return engine, which can understate uncertainty when prices are stale or unavailable.
+| Capability | Selected historical backtest | Later minute-level simulator |
+| --- | --- | --- |
+| Fill prices and timing | Close-based return convention | Minute-bar price proxies, with latency |
+| Liquidity constraints | No volume-constrained fills | Participation caps based on preceding completed volume; residual quantities carried as partial fills |
+| Tradable quantities | Continuous portfolio weights | Whole lots and adverse tick rounding |
+| Trading costs | Excluded | Configurable fees and slippage assumptions |
+| Funding and borrowing | Simplified RUONIA cash/funding; no stock-borrow fees | Cash/share accounting with funding and borrow-cost assumptions |
+| Portfolio limits | Strategy weights and netting | Gross/net exposure, individual-stock and turnover limits |
 
-The funding convention uses annual RUONIA divided by 252. It combines a charge on one unit of borrowed principal with cash accrual on one minus net exposure. The resulting net financing adjustment is **minus net exposure times the daily RUONIA rate**. Flat and net-zero positions therefore receive no net RUONIA accrual under this convention. These assumptions do not reproduce every broker's cash, margin or stock-borrow terms.
+The later simulator is a **research prototype**. Existing tests cover timing, partial fills, unavailable shorts, lot/tick constraints, costs, funding and restart accounting; the 16-test suite passes. These checks establish accounting behavior, not improved performance or deployed execution.
 
-Factor-portfolio ranking histories use fixed-weight return proxies, while the assembled strategy drifts security weights between resets. The distinction matters when comparing diagnostics or attributing returns. Close-based rebalancing is a return-timing assumption; it does not demonstrate that orders could fill at the closing price.
+Historical order-book depth and a calibrated market-impact model are not available in this evidence. VWAP appears as an execution benchmark; a deployed VWAP execution algorithm has not been established. The later simulator has not been used to restate the selected strategy's headline returns.
 
-## Rebalancing and liquidity
+## Interpretation and next steps
 
-I explored staggered tranches and shifted rebalance starts to assess sensitivity to timing. Tranches spread portfolio refreshes across schedules, although calendar grouping can make some dates coincide. They were not used in the selected `f76421ce` configuration.
+The main research limitations are the fixed universe, assumed information availability and missing-return handling. Part of the earlier factor implementation also applies a rolling-signal shift across stock boundaries at the first observation of a new stock. Historical strategy versions therefore need to be distinguished when reproducing or extending the work.
 
-The original results do **not** model volume participation limits, partial fills, liquidity-dependent execution delays, slippage, market impact, commissions or stock-borrow fees. A staggered schedule alone does not establish liquidity-aware execution. Capacity and executable returns require a separate execution model and trading evidence; later execution research does not retroactively change these backtests.
-
-## Research limits
-
-The main uncertainties are the fixed universe, assumed financial-release dates, missing-return handling and differences between historical strategy versions. A rolling-signal shift also crosses stock boundaries at the first observation of a new stock in part of the research implementation. Full-window scoring and visibility of test results during research further limit claims of independent out-of-sample performance.
-
-The [research process](research.md) explains the searches and validation exercises. The [results](results.md) distinguish the configuration I used from other research configurations and from realized trading P&L.
+The next evaluation step is to apply the execution model to a frozen configuration and reserved period, with measured spread, borrow and liquidity inputs. That would support a more informative comparison of theoretical and executable returns. [Searches and validation evidence](research.md).

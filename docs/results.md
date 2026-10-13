@@ -1,25 +1,41 @@
-# Results: selected configuration
+# Selected strategy: results
 
 [Overview](../README.md) · [Strategy](strategy.md) · [Research process](research.md)
 
-I selected **`f76421ce`** because its backtest results looked promising and used that configuration in live trading. This page presents the historical simulation of that configuration; the figures are **not realized live P&L**.
+I selected **`f76421ce`** because its backtest results looked promising and used this configuration in live trading. This page reports its **historical simulation after modeled cash and funding, before trading costs**. Realized live account returns are not presented.
 
-## Selected configuration: `f76421ce`
+## Performance
 
-| Backtest segment | Dates | Total return | CAGR | Annualized Sharpe | Maximum drawdown |
+| Reporting segment | Dates | Total return | CAGR | Annualized Sharpe | Maximum drawdown |
 | --- | --- | ---: | ---: | ---: | ---: |
-| Full | 1 Jul 2022–6 Apr 2026 | **+171.09%** | 30.33% | 2.13 | 13.69% |
-| Training segment | 1 Jul 2022–14 Feb 2025 | +116.25% | 34.15% | 2.44 | 7.01% |
-| Later reporting segment | 17 Feb 2025–6 Apr 2026 | **+25.36%** | 22.12% | 1.51 | 13.69% |
+| Full history | 1 Jul 2022–6 Apr 2026 | **+171.09%** | **30.33%** | **2.13** | **13.69%** |
+| Earlier segment | 1 Jul 2022–14 Feb 2025 | +116.25% | 34.15% | 2.44 | 7.01% |
+| Later segment | 17 Feb 2025–6 Apr 2026 | **+25.36%** | 22.12% | 1.51 | 13.69% |
 
-![Cumulative returns and drawdown for f76421ce](assets/selected_f76421ce.png)
+![Selected strategy: historical portfolio wealth and drawdown](assets/selected_f76421ce.png)
 
-This configuration rebalances daily at the close, uses 0.75 months of portfolio momentum and selects 10 stocks per factor-portfolio leg. It weights qualifying portfolios by positive momentum and uses no staggered tranches.
+The chart starts portfolio wealth at 100. The blue shaded interval marks the later reporting segment. Drawdown measures the decline from the preceding portfolio peak; a profitable strategy can still experience substantial drawdowns.
 
-The simulation includes cash and RUONIA funding adjustments. It excludes commissions, bid–ask spreads, slippage, market impact, stock-borrow fees and volume-constrained fills. The full series contains 954 observations, including the initial zero-return period through 11 January 2023. The original evaluation reused fixed factor specifications and scored the full window. Its 70/30 split is a reporting division, so the later segment should not be interpreted as an untouched holdout.
+The selected setup uses daily close rebalancing, a 0.75-month portfolio-momentum lookback and ten stocks per selection leg. Capital is allocated proportionally across qualifying positive-momentum candidates, with no staggered tranches. [Configuration and accounting](strategy.md#selected-configuration).
 
-## Reading the results
+## What the figures include
 
-Returns are compounded. CAGR uses elapsed calendar time. Sharpe is the mean daily return divided by its sample standard deviation, annualized with `sqrt(252)`, without an additional risk-free subtraction after financing. Maximum drawdown is reported as a positive loss magnitude in the table; the chart shows declines from prior portfolio peaks.
+- **Cash and funding:** saved RUONIA funding charges and cash accrual are included.
+- **Execution:** commissions, spreads, slippage, market impact, stock-borrow fees and volume-constrained fills are excluded. The later execution simulator is a separate research extension.
+- **Calendar:** 954 Monday–Friday observations, including the initial zero-return interval through 11 January 2023. The first nonzero return is on 12 January 2023.
+- **Selection:** six fixed specifications were reused and assessed over the full history. The 70/30 division is a reporting split; neither segment establishes an independent final holdout. Test results were visible during research and could influence configuration selection.
 
-Other configurations produced mixed results, including negative later-period returns. The separate [grid, Optuna and walk-forward experiments](research.md#experiment-diagnostics) document that sensitivity; they do not establish the robustness of `f76421ce`. Full-period scoring and visibility of test results during research limit any out-of-sample interpretation of the selected configuration.
+## How the metrics are calculated
+
+| Metric | Definition |
+| --- | --- |
+| Total return | Compound all daily portfolio returns within the stated segment. |
+| CAGR | Annualize the compounded return using elapsed calendar time and a 365.25-day year. |
+| Annualized Sharpe | Daily mean return divided by sample standard deviation, multiplied by √252. No additional risk-free series is subtracted after financing. |
+| Maximum drawdown | Largest decline from a preceding wealth peak, shown as a positive loss magnitude in the table. |
+
+Figures were reconciled against the saved daily return series and run summaries. Segment returns compound; they should not be added together.
+
+No benchmark outperformance is claimed. The earlier benchmark snapshot contains MCFTR under an IMOEXF input label and ends before the full evaluation period; a like-for-like full-period comparison is not established here.
+
+Other configurations produced mixed results, including negative later-period returns. Their [grid, Optuna and walk-forward diagnostics](research.md#experiment-diagnostics) remain available as research context. They do not establish robustness of the selected configuration.

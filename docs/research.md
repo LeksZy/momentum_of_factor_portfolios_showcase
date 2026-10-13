@@ -1,58 +1,60 @@
 # Research process
 
-[Overview](../README.md) · [Strategy](strategy.md) · [Results](results.md)
+[Overview](../README.md) · [Strategy](strategy.md) · [Selected results](results.md)
 
-## Research question
+I built the pipeline from data ingestion and factor construction through portfolio simulation, parameter searches and evaluation. The research question is whether recent factor-portfolio performance can help allocate capital across stock-selection styles.
 
-The project studies whether the recent performance of factor portfolios can guide a changing allocation across them. Stock-level factors define candidate portfolios; momentum of those portfolios determines which candidates receive capital. This separates the signal used to select securities from the signal used to allocate among investment styles.
+## Data engineering and provenance
 
-My work covered data preparation, factor construction, portfolio simulation, parameter optimization and evaluation. I ultimately selected `f76421ce` for live use on the strength of its promising historical results. Its published performance remains backtested performance, distinct from live account returns.
+The private companion project contains collectors for MOEX ISS and optional AlgoPack market data, MOEX dividend/split feeds, CBonds dividends and financial reports, and CBR RUONIA rates. Incremental date-based updates and SQLite upserts support repeatable refreshes. Parquet snapshots provide reusable inputs for research; a review interface exposes signals, allocations and saved runs.
 
-## Data preparation
+Processing includes instrument metadata, split-adjustment bookkeeping, financial-statement currency/unit normalization and trailing-earnings calculations. These implemented connectors clarify the collection pipeline. They do not, on their own, reconstruct the exact historical input snapshot or corporate-action conventions behind every saved experiment.
 
-The research combines closing prices, dividend events, financial ratios, a market benchmark and RUONIA rates. A fixed universe of 45 identifiers is used in the research version; 41 have quotes in its local price snapshot. This is a static research universe, without reconstructed historical index membership or a liquidity screen.
+The earlier research version has a fixed universe of 45 identifiers, with quotes available for 41 in its local snapshot. There is no historical index-membership reconstruction or original volume-based eligibility filter.
 
-| Input | Coverage in the research snapshot | Treatment and limitations |
+| Input | Earlier research snapshot | Processing and open questions |
 | --- | --- | --- |
-| Closing prices | Jan 2015–Jan 2026; 86 tickers before universe filtering | Used for returns and factor calculations; this table has no intraday volume or spread data. |
-| Dividends | Jan 2015–Jan 2026; 744 events | Added to returns on the next observed trading date. Original event-date and tax conventions remain unspecified. |
-| Financial ratios | Mar 2020–Sep 2025; 648 observations | P/E and P/B are matched backward after an assumed 30-day availability lag. Actual publication timestamps are unavailable. |
-| Market benchmark | Jan 2015–Nov 2025 | Stored as MCFTR despite an IMOEXF input label; coverage ends before several strategy evaluations. |
-| RUONIA | Jan 2022–Jan 2026; 991 observations | Converted to annual decimal rates and used in the model's funding convention. |
+| Closing prices | Jan 2015–Jan 2026; 86 tickers before universe filtering | Align by security and date; the research table has no intraday volume or spread data. |
+| Dividends | Jan 2015–Jan 2026; 744 events | Add amounts to returns on the next observed trading date; original event-date and tax conventions remain unresolved. |
+| Financial ratios | Mar 2020–Sep 2025; 648 observations | Backward matching with an assumed 30-day availability lag in research; original publication timestamps are unavailable. |
+| Market benchmark | Jan 2015–Nov 2025 | Snapshot contains MCFTR despite an IMOEXF input label; it ends before several evaluation periods. |
+| RUONIA | Jan 2022–Jan 2026; 991 observations | Normalize to annual decimal rates and apply the model's funding convention. |
 
-These dates describe the research snapshot. The selected configuration used a later SQL-derived dataset through April 2026. The original collectors and exact historical input snapshot are not included here; provider attribution and corporate-action adjustments cannot be fully reconstructed from the available records.
+The selected strategy uses a later SQL-derived input snapshot through April 2026. Different snapshots must not be treated as interchangeable. The main simulator fills missing security returns with zero, while some factor calculations omit missing observations; this affects comparability and the treatment of stale prices.
 
-Observations are aligned by security and trading date. The main simulation substitutes zero for missing security returns, while some factor-return calculations omit missing observations. This difference can affect exposure and comparability. An assumed reporting lag also does not guarantee that every financial observation was available at the simulated decision time.
+## Search design
 
-## Parameter optimization
+The search has two levels. The **inner search** chooses a portfolio specification for each enabled factor category: its signal, observation window and long/short direction. The **outer search** varies how those portfolios are selected and combined.
 
-The inner search chooses one portfolio specification per enabled factor category. Each specification sets the factor, its observation window and the portfolio direction. Combinations are either evaluated exhaustively or sampled without replacement using a fixed seed and a maximum evaluation budget.
+| Study | Search space and computation | Saved evidence |
+| --- | --- | --- |
+| 24-setting grid | Weekly, biweekly or monthly resets; 1- or 3-month portfolio momentum; 5 or 10 stocks per leg; 1 or 2 selected portfolios. Up to 65,536 inner combinations per setting; base seed 42, derived per-setting seeds and all available workers. | Completed return series and chronological train/test summaries. |
+| Earlier 54-setting grids | Added a 0.5-month lookback and a third selected portfolio; combination budgets varied between runs. | Additional parameter-search records; different runs are not controlled comparisons. |
+| 50-trial Optuna study | Weekly/biweekly/monthly resets; 0.5/1/3-month momentum; 1–2 selected portfolios; 1–3 tranches; ten stocks per leg. Up to 25,000 inner combinations per trial, base seed 42, derived trial seeds and ten workers. | 50 completed trials covering 20 distinct outer settings; separate train/test summaries. |
+| Selected configuration | Six fixed candidates, daily resets, 0.75-month momentum and momentum-proportional weights. | A fixed-specification evaluation; no new combination search in this run. |
 
-The outer searches vary portfolio-momentum lookback, rebalance frequency, stock count, factor count and, in selected experiments, tranche count. Cached candidate returns, array-based calculations and parallel workers reduce repeated computation.
+The primary objective is annualized daily Sharpe. Other experiments use return–drawdown objectives or rebalance-start sensitivity penalties. The optimizer supports both Optuna grid and TPE sampling; the saved 50-trial configuration does not record its sampler choice.
 
-The completed studies include:
+To control computation, I cached candidate returns, used array-based portfolio calculations and parallelized independent evaluations with joblib. When exhaustive search was too large, the inner search sampled distinct combinations with deterministic seeds and a fixed evaluation budget. This makes searches repeatable under matching inputs, without claiming a global optimum or a measured speedup.
 
-- A 24-setting grid across weekly, biweekly and monthly rebalancing, one- and three-month momentum, five or ten stocks per leg, and one or two selected factor portfolios.
-- Earlier 54-setting grids with an additional half-month lookback and a third selected factor portfolio, using combination budgets up to 65,536.
-- A 50-trial Optuna study with 20 distinct outer parameter combinations, one to three tranches, ten stocks per leg, and a 25,000-combination budget per trial. Its base seed is 42; individual trials use different derived seeds.
-
-The main objective is annualized daily Sharpe. Other experiments use return–drawdown objectives or sensitivity penalties. Repeated trials and capped searches do not establish a globally optimal strategy.
-
-`f76421ce` is a fixed-specification evaluation, reusing six previously selected candidates. It uses daily close rebalancing, a 0.75-month momentum window and momentum-proportional weights above a historical zero cutoff. Its reporting run performs no new combination search. Later defaults use a 1.5% cutoff, which would change the strategy.
+The selected run reused six previously selected specifications. Its saved settings include seed 42, one worker and a combination cap of one. These are evaluation settings, not evidence that the selected strategy emerged from a one-trial optimization. Later changes to momentum thresholds and execution assumptions are separate strategy versions.
 
 ## Validation and interpretation
 
-Chronological train/test splits and expanding-window evaluations are present in the research. The 24-setting grid trains through 10 June 2025 and tests from 11 June 2025 to 22 January 2026. The separate Optuna example trains through 6 September 2025 and tests from 7 September 2025 to 13 March 2026. Neither saved example has a separate validation interval.
+| Evaluation | Chronology | Interpretation |
+| --- | --- | --- |
+| 24-setting grid | Train: 3 Jan 2024–10 Jun 2025; test: 11 Jun 2025–22 Jan 2026 | Training-ranked configurations were assessed in a later period. No separate validation interval. |
+| Optuna example | Train: 2 May 2024–6 Sep 2025; test: 7 Sep 2025–13 Mar 2026 | A different input snapshot, including weekend observations. No separate validation interval. |
+| Expanding-window exercise | Two successive later periods, with factor combinations reselected from preceding history | Fold averages and compounded returns across both periods answer different questions. |
+| Selected strategy | Full history divided 70/30; later reporting begins 17 Feb 2025 | Fixed specifications and full-window scoring; the split is not an independent final test. |
 
-Walk-forward experiments reselect the factor combination using expanding historical windows. Fold-average statistics and returns compounded across disjoint test periods answer different questions and must be kept separate. A completed two-fold example provides an additional assessment; incomplete later batches do not establish comprehensive robustness.
+Test statistics were visible during research and could influence configuration choices. Separate studies therefore cannot be arranged into a proven sequence of improvements. Rebalance-start sensitivity was also explored, but the saved multi-anchor batch produced no successful trials. Incomplete batches do not establish robustness.
 
-The selected configuration's 70/30 split divides its completed return series for reporting, with the later segment starting on 17 February 2025. Full-period scoring and visibility of test statistics during research prevent treating this as independent final out-of-sample evidence. Rebalance-start sensitivity was also explored, but the saved multi-anchor study produced no successful trials.
+## Execution research and reproducibility
 
-## Trading considerations
+Subsequent work added a minute-level execution simulator, liquidity and capacity diagnostics, and paper-replay accounting. Participation limits, partial fills, latency, tradable lot sizes and cost assumptions are implemented there. VWAP is used as a benchmark. These extensions have engineering tests, but no reconciled result here demonstrates improved performance under execution constraints. [Implementation and remaining limits](strategy.md#rebalancing-and-execution-research).
 
-The model aggregates overlapping positions, allows weight drift and applies simplified RUONIA cash and funding adjustments. Its close-price timing convention assumes execution without modelling an order book. The selected results exclude transaction costs, slippage, market impact and borrow fees.
-
-Staggered tranches were explored as a way to distribute rebalance timing. They are disabled in `f76421ce`, and do not themselves impose capacity constraints. Participation limits, partial fills, execution delays and liquidity-dependent costs remain separate modelling requirements before the historical returns can support a capacity or executable-return estimate.
+The public repository contains documentation and summary figures. Reproducing the historical strategy requires the private implementation, the matching version and configuration, and the original price, dividend, financial and funding snapshots. Current collectors or defaults alone are insufficient to reproduce an old run exactly. The published selected-strategy metrics were recomputed from saved daily returns; they are not a new backtest using today's data.
 
 ## Experiment diagnostics
 
